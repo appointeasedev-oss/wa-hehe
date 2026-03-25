@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp HeHo Bot</title>
+</head>
+<body>
+    <h1>WhatsApp HeHo Bot</h1>
+    <form method="POST" action="/pair">
+        <label>Enter your WhatsApp number (with country code, no +):</label><br>
+        <input type="text" name="number" required placeholder="918852099490" /><br><br>
+        <button type="submit">Get Pairing Code</button>
+    </form>
+
+    <% if (code) { %>
+        <h2>📱 Your Pairing Code:</h2>
+        <p><strong><%= code %></strong></p>
+        <p>Open WhatsApp → Linked Devices → Link with phone number → enter this code</p>
+    <% } %>
+
+    <% if (error) { %>
+        <p style="color:red;">❌ Error: <%= error %></p>
+    <% } %>
+</body>
+</html>
