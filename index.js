@@ -1,15 +1,18 @@
 const express = require("express");
+const path = require("path");
 const {
     default: makeWASocket,
     useMultiFileAuthState,
     fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys");
-
-const axios = require("axios");
 const P = require("pino");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
 // ===== CONFIG =====
 const HEHO_API_KEY = "heho_f1ccc91038e7d090bc3faa23";
@@ -34,6 +37,86 @@ async function askAI(message) {
                     "Content-Type": "application/json"
                 }
             }
+        );
+        return res.data.reply || "No response";
+    } catch {
+        return "⚠️ AI error";
+    }
+}
+
+// 🚀 Initialize Bot
+async function initBot() {
+    const { state, saveCreds } = await useMultiFileAuthState("auth");
+    const { version } = await fetchLatestBaileysVersion();
+
+    sock = makeWASocket({
+        version,
+        auth: state,
+        logger: P({ level: "silent" }),
+        browser: ["RailwayBot", "Chrome", "1.0"],
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+
+        if (connection === "open") {
+            console.log("✅ WhatsApp Connected");
+        }
+        if (connection === "close") {
+            console.log("❌ Disconnected");
+        }
+    });
+
+    sock.ev.on("messages.upsert", async (m) => {
+        try {
+            const msg = m.messages[0];
+            if (!msg.message) return;
+
+            const sender = msg.key.remoteJid;
+            if (!currentNumber || sender !== `${currentNumber}@s.whatsapp.net`) return;
+
+            const text =
+                msg.message.conversation ||
+                msg.message.extendedTextMessage?.text;
+
+            if (!text) return;
+
+            const reply = await askAI(text);
+
+            await sock.sendMessage(sender, { text: reply });
+
+        } catch {}
+    });
+}
+
+initBot();
+
+// 🌐 Web page
+app.get("/", (req, res) => {
+    res.render("index", { code: null, error: null });
+});
+
+// 🌐 Generate pairing code
+app.post("/pair", async (req, res) => {
+    try {
+        const { number } = req.body;
+        if (!number) return res.render("index", { code: null, error: "Number required" });
+
+        currentNumber = number;
+
+        const code = await sock.requestPairingCode(number);
+
+        return res.render("index", { code, error: null });
+    } catch (err) {
+        return res.render("index", { code: null, error: err.message });
+    }
+});
+
+// start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port", PORT));
         );
 
         return res.data.reply || "No response";
